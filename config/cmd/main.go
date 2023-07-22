@@ -46,14 +46,14 @@ func main() {
 	// repositories are initialized
 	eventRepository := repository.NewEventRepository(db)
 
-	// usecases are initialized
+	// use-cases are initialized
 	eventUseCases := cases.NewEventUseCases(eventRepository)
 
 	// controllers are initialized
 	eventController := events.NewEventController(eventUseCases)
 
 	// consumer is initialized
-	sqs, err := builder.NewConsumer(logger, config, sessionSQS, eventRepository)
+	sqs, err := builder.NewConsumer(logger, config, sessionSQS, sessionS3, eventRepository)
 	if err != nil {
 		logger.Fatalf("error in SQS : %v", err)
 	}
