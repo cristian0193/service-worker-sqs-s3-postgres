@@ -5,10 +5,13 @@ import (
 	"os/signal"
 	"service-worker-sqs-s3-postgres/config/cmd/builder"
 	"service-worker-sqs-s3-postgres/core/domain"
-	cases "service-worker-sqs-s3-postgres/core/usecases/events"
-	repository "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/events"
+	cfiledata "service-worker-sqs-s3-postgres/core/usecases/filedata"
+	cmetadata "service-worker-sqs-s3-postgres/core/usecases/metadata"
+	rfiledata "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/filedata"
+	rmetadata "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/metadata"
 	"service-worker-sqs-s3-postgres/dataproviders/server"
-	"service-worker-sqs-s3-postgres/entrypoints/controllers/events"
+	hfiledata "service-worker-sqs-s3-postgres/entrypoints/controllers/filedata"
+	hmetadata "service-worker-sqs-s3-postgres/entrypoints/controllers/metadata"
 	"syscall"
 )
 
@@ -44,16 +47,19 @@ func main() {
 	}
 
 	// repositories are initialized
-	eventRepository := repository.NewEventRepository(db)
+	filedataRepository := rfiledata.NewFileDataRepository(db)
+	metadataRepository := rmetadata.NewMetaDataRepository(db)
 
 	// use-cases are initialized
-	eventUseCases := cases.NewEventUseCases(eventRepository)
+	filedataUseCases := cfiledata.NewFileDataUseCases(filedataRepository)
+	metadataUseCases := cmetadata.NewMetaDataUseCases(metadataRepository)
 
 	// controllers are initialized
-	eventController := events.NewEventController(eventUseCases)
+	filedataController := hfiledata.NewFileDataController(filedataUseCases)
+	metadataController := hmetadata.NewMetaDataController(metadataUseCases)
 
 	// consumer is initialized
-	sqs, err := builder.NewConsumer(logger, config, sessionSQS, sessionS3, eventRepository)
+	sqs, err := builder.NewConsumer(logger, config, sessionSQS, sessionS3, filedataRepository, metadataRepository)
 	if err != nil {
 		logger.Fatalf("error in SQS : %v", err)
 	}
@@ -66,7 +72,7 @@ func main() {
 	go processor.Start()
 
 	// server is initialized
-	srv := server.NewServer(config.Port, eventController)
+	srv := server.NewServer(config.Port, filedataController, metadataController)
 	if err = srv.Start(); err != nil {
 		logger.Fatalf("error Starting Server: %v", err)
 	}

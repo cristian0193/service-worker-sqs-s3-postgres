@@ -7,9 +7,13 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"service-worker-sqs-s3-postgres/core/domain"
+	"service-worker-sqs-s3-postgres/core/domain/entity"
 	"service-worker-sqs-s3-postgres/dataproviders/awss3/downloader"
 	"service-worker-sqs-s3-postgres/dataproviders/awssqs"
-	repository "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/events"
+	"service-worker-sqs-s3-postgres/dataproviders/consumer/csvreader"
+	"service-worker-sqs-s3-postgres/dataproviders/mapper"
+	rfiledata "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/filedata"
+	rmetadata "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/metadata"
 	"sync"
 )
 
@@ -20,7 +24,8 @@ type SQSSource struct {
 	log         *zap.SugaredLogger
 	maxMessages int
 	closed      bool
-	repo        repository.IEventRepository
+	rFiledata   rfiledata.IFileDataRepository
+	rMetadata   rmetadata.IMetaDataRepository
 	wg          sync.WaitGroup
 }
 
@@ -38,13 +43,14 @@ var (
 )
 
 // New return an event stream instance from SQS.
-func New(sqsClient *awssqs.ClientSQS, download *downloader.S3Downloader, logger *zap.SugaredLogger, maxMessages int, repo repository.IEventRepository) (*SQSSource, error) {
+func New(sqsClient *awssqs.ClientSQS, download *downloader.S3Downloader, logger *zap.SugaredLogger, maxMessages int, rfd rfiledata.IFileDataRepository, rmd rmetadata.IMetaDataRepository) (*SQSSource, error) {
 	return &SQSSource{
 		sqs:         sqsClient,
 		download:    download,
 		log:         logger,
 		maxMessages: maxMessages,
-		repo:        repo,
+		rFiledata:   rfd,
+		rMetadata:   rmd,
 		wg:          sync.WaitGroup{},
 	}, nil
 }
@@ -79,8 +85,8 @@ func (s *SQSSource) Consume() <-chan *domain.Event {
 // processMessage read message in queue.
 func (s *SQSSource) processMessage(msg *sqs.Message, out chan *domain.Event) {
 	trackID := createTrackID(msg)
-
 	logger := s.log.With("trackId", trackID)
+
 	logger.Infof("Step 1 - Start to process SQS event")
 
 	s3Event, err := toS3Event(msg)
@@ -103,23 +109,36 @@ func (s *SQSSource) processMessage(msg *sqs.Message, out chan *domain.Event) {
 		return
 	}
 
-	logger.Infof("Step 2.1 - Event from path: %s", filename)
+	logger.Infof("Step 3 - Event from path: %s", filename)
 
-	//TODO: read file and mapping in struct
-
-	//TODO: saved in database
-
-	/*eventDB := &entity.Events{
-		ID:      *msg.MessageId,
-		Message: records.Message,
-		Date:    time.Now().Format(time.RFC3339),
+	filedata, err := fileMapping(filename, logger)
+	if err != nil {
+		logger.Errorf("Error processing file from CSV in [path = %s]: %v", s3Event.key, err)
+		if err = s.sqs.DeleteMessage(msg); err != nil {
+			logger.Errorf("Error deleting message from SQS in [path = %s]: %v", s3Event.key, err)
+		}
+		return
 	}
 
-	if err = s.repo.Insert(eventDB); err != nil {
-		logger.Errorf("Error inserting message: %v", err)
+	if err = s.rFiledata.Insert(filedata); err != nil {
+		logger.Errorf("Error inserting message in FileData: %v", err)
 	}
 
-	logger.Info("Step 3 - File saved in postgres")*/
+	logger.Info("Step 4 - File saved in postgres: FileData")
+
+	metadata := entity.MetaData{
+		TrackID:  trackID,
+		Bucket:   s3Event.bucket,
+		FileName: filename,
+		Key:      s3Event.key,
+		Size:     s3Event.fileSize,
+	}
+
+	if err = s.rMetadata.Insert(metadata); err != nil {
+		logger.Errorf("Error inserting message in MetaData: %v", err)
+	}
+
+	logger.Info("Step 4 - File saved in postgres: MetaData")
 
 	event := &domain.Event{
 		TrackID:       trackID,
@@ -131,7 +150,7 @@ func (s *SQSSource) processMessage(msg *sqs.Message, out chan *domain.Event) {
 		Filename:      filename,
 	}
 	s.wg.Add(1)
-	logger.Infof("Step 4 - Event produced for ID = %s)", trackID)
+	logger.Infof("Step 5 - Event produced for ID = %s)", trackID)
 	out <- event
 }
 
@@ -149,7 +168,7 @@ func (s *SQSSource) Processed(event *domain.Event) error {
 			logger.Errorf("Deleting of sqs message. %v", err)
 			return err
 		}
-		logger.Infof("Successful deleted sqs message")
+		logger.Infof("Step 6 - Successful deleted sqs message")
 		return nil
 	}
 	logger.Warnf("Event isn't sqs message")
@@ -196,4 +215,18 @@ func toS3Event(msg *sqs.Message) (*s3Event, error) {
 		fileSize:   record.Get("s3.object.size").Int(),
 		sqsMessage: msg,
 	}, nil
+}
+
+func fileMapping(fileName string, logger *zap.SugaredLogger) ([]entity.FileData, error) {
+	csv, err := csvreader.Read(fileName, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	filedata := make([]entity.FileData, 0)
+	for _, row := range csv {
+		f := mapper.ToEntityFileData(&row)
+		filedata = append(filedata, *f)
+	}
+	return filedata, nil
 }

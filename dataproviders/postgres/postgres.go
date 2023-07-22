@@ -68,7 +68,7 @@ func (client *ClientDB) Open() error {
 		sqlDB.SetConnMaxIdleTime(10)
 		sqlDB.SetMaxOpenConns(10)
 
-		err = dbs.AutoMigrate(entity.Events{})
+		err = dbs.AutoMigrate(entity.FileData{}, entity.MetaData{})
 		if err != nil {
 			return errors.Wrapf(err, "Error migrating postgres : %v", err.Error())
 		}
