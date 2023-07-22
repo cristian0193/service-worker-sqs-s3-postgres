@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"service-worker-sqs-s3-postgres/entrypoints/controllers/events"
+	hfiledata "service-worker-sqs-s3-postgres/entrypoints/controllers/filedata"
+	hmetadata "service-worker-sqs-s3-postgres/entrypoints/controllers/metadata"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -22,7 +23,7 @@ type Server struct {
 }
 
 // NewServer creates an instance of Http Server.
-func NewServer(port int, ec *events.EventController) *Server {
+func NewServer(port int, ec *hfiledata.FileDataController, mc *hmetadata.MetaDataController) *Server {
 	e := echo.New()
 
 	// middleware
@@ -34,8 +35,11 @@ func NewServer(port int, ec *events.EventController) *Server {
 	// prefix
 	path := e.Group(rootPrefix)
 
-	// events
-	path.GET("/sqs/:id", ec.GetID)
+	// filedata
+	path.GET("/s3/filedata/:id", ec.GetID)
+
+	// metadata
+	path.GET("/s3/metadata/:trackid", mc.GetID)
 
 	return server
 }

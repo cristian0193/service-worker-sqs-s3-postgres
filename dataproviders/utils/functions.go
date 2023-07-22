@@ -5,11 +5,12 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"path"
+	"strconv"
 	"time"
 )
 
 const (
-	TmpPath = "/tmp/files/s3downloader"
+	TmpPath = "/tmp/files/s3"
 	Layout  = "2006-01-02T15-04-05.000000000"
 )
 
@@ -32,4 +33,16 @@ func Close(c io.Closer, log *zap.SugaredLogger) {
 	if err := c.Close(); err != nil {
 		log.Error(err)
 	}
+}
+
+// StringToInt64 convert string to int64.
+func StringToInt64(s string) *int64 {
+	if s == "" {
+		return nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &n
 }

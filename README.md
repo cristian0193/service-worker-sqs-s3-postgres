@@ -1,4 +1,4 @@
-# Service Worker SQS - Postgres
+# Service Worker SQS - S3 - Postgres
 
 ## Tabla de contenido
 1. [Contexto](#contexto)
@@ -47,6 +47,7 @@ Las siguientes dependencias se utilizan en el desarrollo para llevar a cabo depl
 **Servicios AWS**
 
 * [SQS](https://aws.amazon.com/es/sqs/)
+* [S3](https://aws.amazon.com/es/s3/)
 
 **Bases de datos**
 
@@ -100,6 +101,8 @@ AWS_SQS_URL=
 AWS_SQS_MAX_MESSAGES=
 AWS_SQS_VISIBILITY_TIMEOUT=
 
+AWS_S3_BUCKET=
+
 DB_PORT=
 DB_HOST=
 DB_NAME=
@@ -118,6 +121,9 @@ En el proceso local podemos utilizar despliegues de contenedores con postgres RD
 
     2. Creacion de SQS en AWS
         - https://aws.amazon.com/es/sqs/
+
+    3. Creacion de bucket S3 en AWS
+        - https://aws.amazon.com/es/s3/
 
     3. Automigracion en gorm activa
 

@@ -35,7 +35,7 @@ func (p *Processor) handleEvent(event *domain.Event) {
 		event.Log.Errorf("Error processing event: %v", err)
 	}
 	elapsed := time.Since(time.Now())
-	event.Log.Infof("Step 5 - Event finished in %dms", elapsed.Milliseconds())
+	event.Log.Infof("Step 7 - Event finished in %dms", elapsed.Milliseconds())
 }
 
 // Stop stops the Processor execution.
