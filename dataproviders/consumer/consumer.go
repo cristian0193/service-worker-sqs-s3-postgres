@@ -7,11 +7,9 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"service-worker-sqs-s3-postgres/core/domain"
-	"service-worker-sqs-s3-postgres/core/domain/entity"
 	"service-worker-sqs-s3-postgres/dataproviders/awss3/downloader"
 	"service-worker-sqs-s3-postgres/dataproviders/awssqs"
 	"service-worker-sqs-s3-postgres/dataproviders/consumer/csvreader"
-	"service-worker-sqs-s3-postgres/dataproviders/mapper"
 	rfiledata "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/filedata"
 	rmetadata "service-worker-sqs-s3-postgres/dataproviders/postgres/repository/metadata"
 	"sync"
@@ -126,7 +124,7 @@ func (s *SQSSource) processMessage(msg *sqs.Message, out chan *domain.Event) {
 
 	logger.Info("Step 4 - File saved in postgres: FileData")
 
-	metadata := entity.MetaData{
+	metadata := domain.MetaData{
 		TrackID:  trackID,
 		Bucket:   s3Event.bucket,
 		FileName: filename,
@@ -217,16 +215,15 @@ func toS3Event(msg *sqs.Message) (*s3Event, error) {
 	}, nil
 }
 
-func fileMapping(fileName string, logger *zap.SugaredLogger) ([]entity.FileData, error) {
+func fileMapping(fileName string, logger *zap.SugaredLogger) ([]*domain.FileData, error) {
 	csv, err := csvreader.Read(fileName, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	filedata := make([]entity.FileData, 0)
+	filedata := make([]*domain.FileData, 0)
 	for _, row := range csv {
-		f := mapper.ToEntityFileData(&row)
-		filedata = append(filedata, *f)
+		filedata = append(filedata, &row)
 	}
 	return filedata, nil
 }
