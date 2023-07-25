@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"service-worker-sqs-s3-postgres/core/domain/exceptions"
 	cases "service-worker-sqs-s3-postgres/core/usecases/metadata"
-	"service-worker-sqs-s3-postgres/dataproviders/mapper"
 	env "service-worker-sqs-s3-postgres/dataproviders/utils"
 )
 
@@ -27,9 +26,9 @@ func (ec *MetaDataController) GetID(c echo.Context) error {
 	if err != nil {
 		return exceptions.NewError(http.StatusBadRequest, err)
 	}
-	filedata, err := ec.metadataUseCases.GetID(ID)
+	metadata, err := ec.metadataUseCases.GetID(ID)
 	if err != nil {
 		return exceptions.HandleServiceError(err)
 	}
-	return c.JSON(http.StatusOK, mapper.ToDomainMetaData(filedata))
+	return c.JSON(http.StatusOK, metadata)
 }

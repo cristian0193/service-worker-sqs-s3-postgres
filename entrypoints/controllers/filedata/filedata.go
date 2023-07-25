@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"service-worker-sqs-s3-postgres/core/domain/exceptions"
 	cases "service-worker-sqs-s3-postgres/core/usecases/filedata"
-	"service-worker-sqs-s3-postgres/dataproviders/mapper"
 	env "service-worker-sqs-s3-postgres/dataproviders/utils"
 )
 
@@ -31,5 +30,5 @@ func (ec *FileDataController) GetID(c echo.Context) error {
 	if err != nil {
 		return exceptions.HandleServiceError(err)
 	}
-	return c.JSON(http.StatusOK, mapper.ToDomainFileData(filedata))
+	return c.JSON(http.StatusOK, filedata)
 }
