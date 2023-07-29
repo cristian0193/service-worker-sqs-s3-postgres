@@ -1,5 +1,7 @@
 # Service Worker SQS - S3 - Postgres
 
+![Diagrama3 1](https://github.com/cristian0193/service-worker-sqs-s3-postgres/assets/11803196/c49fdc92-cbb2-4c99-acaf-2219610a67c7)
+
 ## Tabla de contenido
 1. [Contexto](#contexto)
 2. [Tecnologías](#tecnologías)
@@ -9,6 +11,7 @@
     * [Local](#local)
 6. [Endpoints](#endpoints)
 7. [Queues](#queues)
+8. [Buckets](#buckets)
 
 
 <a name="contexto"></a>
@@ -58,8 +61,7 @@ Las siguientes dependencias se utilizan en el desarrollo para llevar a cabo depl
 
 Para del proyecto se toma como base los principios de las arquitecturas limpias, utilizando en este caso gran parte del concepto de **arquitectura multicapas**, lo cual permite la independencia de frameworks, entidades externas y UI, por medio de capas con responsabilidad únicas que permite ser testeables mediante el uso de sus interfaces. Como parte de las buenas prácticas la solución cuenta en su gran mayoría con la aplicación de los principios SOLID, garantizando un código limpio, mantenible, reutilizable y escalable.
 
-![service-worker-sqs-s3-postgres](https://github.com/cristian0193/service-worker-sqs-s3-postgres/assets/11803196/f066be29-3b5b-47b9-ad8b-24db04f05d52)
-
+![Diagrama3](https://github.com/cristian0193/service-worker-sqs-s3-postgres/assets/11803196/a2020517-4724-410b-83ea-ee4e96815ec2)
 
 <a name="estructura-del-proyecto"></a>
 ### * **Estructura del proyecto** 🧱
@@ -71,6 +73,8 @@ Para del proyecto se toma como base los principios de las arquitecturas limpias,
     - [ ] `domain/`: administracion de los datos de manera transversal
     - [ ] `usecases/`: define los casos de uso utilizados por el handler
 - [x] `dataproviders/`: contiene la implementacion de los clients externos
+    - [ ] `awss3/`: define el cliente para aws s3
+       - [ ] `downloader/`: genera la creacion del archivo temporal descargado desde s3
     - [ ] `awssqs/`: define el cliente para aws sqs
     - [ ] `consumer/`: define la logica para obtener los mensajes desde el consumidor
     - [ ] `postgres/`: define el cliente que permite la conexion a base de dato
@@ -119,24 +123,29 @@ En el proceso local podemos utilizar despliegues de contenedores con postgres RD
         - docker pull postgres
         - https://aws.amazon.com/es/rds/
 
-    2. Creacion de SQS en AWS
+    2. Creacion de bucket S3 en AWS
+        - https://aws.amazon.com/es/s3/        
+
+    3. Creacion de SQS en AWS
         - https://aws.amazon.com/es/sqs/
 
-    3. Creacion de bucket S3 en AWS
-        - https://aws.amazon.com/es/s3/
+    4. Editar politica de acceso en SQS para reportar eventos desde S3
+        - https://docs.aws.amazon.com/es_es/AmazonS3/latest/userguide/ways-to-add-notification-config-to-bucket.html
 
-    3. Automigracion en gorm activa
+    5. Automigracion en gorm activa
 
-    4. Definir variables de entorno
+    6. Definir variables de entorno
 
-    6. Start 'go run main.go'
+    7. Start 'go run main.go'
 
 <a name="endpoints"></a>
 # Endpoints 🤖
 
-- **GET**    http://localhost:8080/sqs/:id
+**FileData**
+
+- **GET**    http://localhost:8080/s3/filedata/:id
 ```
-curl --location --request GET 'http://localhost:8080/sqs/:id'
+curl --location --request GET 'http://localhost:8080/s3/filedata/:id'
 ```
 
 - **Response**
@@ -144,7 +153,26 @@ curl --location --request GET 'http://localhost:8080/sqs/:id'
   {
     "id": "7a312c5a-e69e-4935-9b33-5dc33919a76f",
     "message": "Hola Mundo!!",
+    "owner": "charodriguez",   
     "date": "2023-06-13T17:48:05-05:00"
+  }
+```
+
+**MetaData**
+
+- **GET**    http://localhost:8080/s3/metadata/:trackid
+```
+curl --location --request GET 'http://localhost:8080/s3/metadata/:trackid'
+```
+
+- **Response**
+```
+  {
+    "trackid": "7a312c5a-e69e-4935-9b33-5dc33919a76f",
+    "bucket": "s3-service-worker",
+    "filename": "file-test.csv",
+    "key": "/files/file-test.csv",
+    "size": 350
   }
 ```
 
@@ -153,13 +181,34 @@ curl --location --request GET 'http://localhost:8080/sqs/:id'
 
 - **URL**    https://sqs.us-east-1.amazonaws.com/XXXXXXXX/service-worker-sqs-s3-postgres
 
-
 - **Message**
 ```
     {
-      "message": "Hello World"
-    }
+     "Records": [
+       {
+         "eventSource": {
+           "aws:s3": {
+             "s3": {
+               "bucket": {
+                 "name": "s3-service-worker"
+               },
+               "object": {
+                 "key": "/files/file-test.csv",
+                 "size": 350
+               }
+             }
+           }
+         }
+       }
+     ]
+   }
 ```
+
+<a name="buckets"></a>
+# Buckets 📂
+
+- **Name**    s3-service-worker
+- **Folder**  /files
 
 # Author 🧑‍💻
 ```
